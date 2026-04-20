@@ -123,7 +123,7 @@ header('Content-Type: text/html; charset=UTF-8');
     <?php endif; ?>
 
     <?php if ($result !== null && !$result->ok && $result->log !== ''): ?>
-      <div class="panel">
+      <div class="panel panel--card">
         <h2>Log (partial)</h2>
         <pre class="log"><?= e($result->log) ?></pre>
       </div>
@@ -131,12 +131,12 @@ header('Content-Type: text/html; charset=UTF-8');
 
     <?php if ($result !== null && $result->ok): ?>
       <div class="alert ok">Build succeeded.</div>
-      <div class="panel">
+      <div class="panel panel--card">
         <h2>Log</h2>
         <pre class="log"><?= e($result->log) ?></pre>
         <?php if ($result->pushTargetUrl !== null && $result->apiKey !== null && $result->profile !== null): ?>
           <div class="magnitu-box">
-            <h2 style="margin-top:0">Magnitu profile “<?= e($result->profile) ?>”</h2>
+            <h2 class="magnitu-title">Magnitu profile “<?= e($result->profile) ?>”</h2>
             <dl>
               <dt>Push target URL</dt>
               <dd><?= e($result->pushTargetUrl) ?></dd>
@@ -183,7 +183,7 @@ header('Content-Type: text/html; charset=UTF-8');
       </div>
 
       <h2>Satellite MySQL &amp; URL</h2>
-      <p style="color:var(--muted);font-size:0.9rem;margin:-0.5rem 0 1rem">These credentials are for the <strong>local</strong> database (scores), not the mothership. Leave blank to use defaults from the slug (same as CLI <code>--no-wizard</code>).</p>
+      <p class="form-hint">These credentials are for the <strong>local</strong> database (scores), not the mothership. Leave blank to use defaults from the slug (same as CLI <code>--no-wizard</code>).</p>
       <div class="row two">
         <div class="field">
           <label for="db_host">MySQL host</label>
