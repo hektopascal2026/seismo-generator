@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/TemplateRenderer.php';
 require_once __DIR__ . '/Archiver.php';
+require_once __DIR__ . '/SatelliteBundlePruner.php';
 
 final class GenerateResult
 {
@@ -118,6 +119,10 @@ final class GenerateService
             $archiver->archive();
             $commit = $archiver->currentCommit();
             $append('  done (from commit ' . $commit . ')');
+
+            $append('  pruning mothership-only paths (satellite bundle) ...');
+            SatelliteBundlePruner::prune($targetDir);
+            $append('  prune complete.');
 
             $append('[2/4] rendering templates ...');
             $renderer = new TemplateRenderer();

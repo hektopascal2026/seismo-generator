@@ -1,6 +1,6 @@
 # seismo-generator
 
-A small PHP tool (CLI **or** a **local web UI**) that builds a deployable **satellite Seismo** folder from a `satellite.json` exported by the mothership Seismo's **Settings → Satellites** tab. The output is a full, ready-to-upload **Seismo 0.5** codebase (default source path) with `SEISMO_SATELLITE_MODE=true` pre-wired to the right mothership DB and Magnitu profile.
+A small PHP tool (CLI **or** a **local web UI**) that builds a deployable **satellite Seismo** folder from a `satellite.json` exported by the mothership Seismo's **Settings → Satellites** tab. The output starts from a **`git archive` of your Seismo checkout**, then **strips mothership-only UI and tooling** so the upload contains only what a satellite needs, with `SEISMO_SATELLITE_MODE=true` pre-wired to the right mothership DB and Magnitu profile.
 
 ## Two MySQL databases — not one
 
@@ -25,7 +25,7 @@ Seismo is built around one central instance that scrapes and stores entries. A *
 
 Satellites are generated from a JSON descriptor. Rebuild + redeploy instead of hand-editing, so the mothership always owns the registry.
 
-The upload is still a **full Seismo 0.5 tree** (`git archive` of your checkout). **Satellite mode** (`SEISMO_SATELLITE_MODE` in `config.local.php`) tells the app to expose only **Timeline**, **Filter**, **Highlights**, and **Settings** (General + Magnitu): no feed/Lex/Leg/diagnostics/source admin — entries are read from the mothership database; Magnitu pushes scores to the satellite’s local DB.
+The upload is a **slim Seismo 0.5 tree**: `git archive` first, then **generator pruning** removes mothership routes/controllers/views (feeds, Lex/Leg, diagnostics, setup, styleguide, …), plus `tests/`, `docs/`, `refresh_cron.php`, and related files. **Satellite mode** (`SEISMO_SATELLITE_MODE` in `config.local.php`) tells the app to expose only **Timeline**, **Filter**, **Highlights**, and **Settings** (General + Magnitu): no feed/Lex/Leg/diagnostics/source admin — entries are read from the mothership database; Magnitu pushes scores to the satellite’s local DB.
 
 ## Prerequisites
 
@@ -126,6 +126,7 @@ seismo-generator/
 ├── lib/
 │   ├── GenerateService.php   # shared build logic (CLI + GUI)
 │   ├── Archiver.php          # git archive of seismo_source into build/<slug>/
+│   ├── SatelliteBundlePruner.php  # remove mothership-only files after archive
 │   ├── TemplateRenderer.php  # {{PLACEHOLDER}} substitution
 │   └── Wizard.php            # readline prompts for MySQL creds
 ├── template/
@@ -150,7 +151,7 @@ php generate.php <satellite.json> [options]
 
 ## Contract with Seismo
 
-The generator produces a folder that is byte-for-byte identical to the Seismo source at `HEAD`, **plus** these four files:
+The generator exports the Seismo source at `HEAD` with `git archive`, then runs **`SatelliteBundlePruner`** to delete mothership-only routes, controllers, views, `tests/`, `docs/`, `routes_mothership.inc.php`, `refresh_cron.php`, and similar (see `lib/SatelliteBundlePruner.php`). Shared `src/` services used by both modes stay in place. It **adds** these generated files:
 
 | File | Purpose |
 |------|---------|
@@ -158,6 +159,7 @@ The generator produces a folder that is byte-for-byte identical to the Seismo so
 | `sql/install.sql`  | Scoring tables + seeded `system_config` (Magnitu API key, profile slug metadata) |
 | `.htaccess`        | Auth header pass-through + deny rules for config/SQL artefacts |
 | `DEPLOY.md`        | Step-by-step deploy checklist for this satellite |
+| `satellite.json`   | Copy of the descriptor used for this build |
 
 The archive uses `git archive` (not rsync), so anything that is `.gitignore`d stays out of the upload. Tooling folders (`.cursor/`, `.github/`, `build/`, terminal dumps, MCP descriptors) are pruned via an overlayed `core.attributesFile` without modifying the Seismo source.
 
@@ -166,4 +168,4 @@ The archive uses `git archive` (not rsync), so anything that is `.gitignore`d st
 - **Local GUI** — `gui/index.php` returns **403** unless `REMOTE_ADDR` is `127.0.0.1` or `::1`. Do not expose it on `0.0.0.0` or a public host; it runs shell-level `git`/`tar` and writes into `build/`.
 - **Schema version** (`satellite.json` `schema_version`) is locked at `1`. If you upgrade Seismo's satellite export format incompatibly, bump both the mothership export and `GenerateService::SCHEMA_VERSION` in `lib/GenerateService.php`.
 - `mothership_remote_refresh_key` appears in plain text inside the generated `config.local.php`. It's also exposed to the satellite's public page so the Refresh button can call the mothership. That's intentional — satellites are public and the key acts as a cheap rate-limit rather than secrecy. If you need to restrict, put the satellite behind HTTP basic auth.
-- The generator does **not** prune unused source files (vendor code, RSS fetcher, scraper module). v1 ships the full archive. v2 could strip scraper-only paths if the satellite footprint matters.
+- **Footprint** — mothership-only PHP UI and dev artefacts are removed after archive; `vendor/` and shared `src/` stay so Composer autoload and satellite routes keep working without a second manifest inside Seismo. Edit `SatelliteBundlePruner::REMOVE_*` when upstream adds routes.
