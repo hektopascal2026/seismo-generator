@@ -1,0 +1,4 @@
+build/*
+!build/.gitkeep
+.DS_Store
+seismo_source/

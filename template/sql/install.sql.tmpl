@@ -1,0 +1,69 @@
+-- ─────────────────────────────────────────────────────────────────────
+-- Install schema for satellite: {{SLUG}} ({{DISPLAY_NAME}})
+--
+-- TWO DATABASES: this file runs only on the SATELLITE'S LOCAL DB (DB_NAME).
+-- Entry rows live in the MOTHERSHIP database ({{MOTHERSHIP_DB}}) — never import
+-- this file there. Local DB = scores + config; mothership DB = entries (SELECT).
+--
+-- Run this on the satellite's own database (DB_NAME in config.local.php)
+-- AFTER granting SELECT on the mothership DB ({{MOTHERSHIP_DB}}) to the
+-- satellite's DB_USER:
+--
+--     GRANT SELECT ON {{MOTHERSHIP_DB}}.* TO '<satellite_db_user>'@'<host>';
+--
+-- Seismo 0.5 applies the rest of the schema via `?action=migrate` (or first-run
+-- migration path). This file creates the minimal local tables the satellite
+-- needs immediately and seeds `system_config` so Magnitu can push scores.
+-- ─────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS entry_scores (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    entry_type ENUM('feed_item', 'email', 'lex_item', 'calendar_event') NOT NULL,
+    entry_id INT NOT NULL,
+    relevance_score FLOAT DEFAULT 0.0,
+    predicted_label VARCHAR(50) DEFAULT NULL,
+    explanation JSON DEFAULT NULL,
+    score_source ENUM('magnitu', 'recipe') DEFAULT 'recipe',
+    model_version INT DEFAULT 0,
+    scored_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_entry (entry_type, entry_id),
+    INDEX idx_entry_type_id (entry_type, entry_id),
+    INDEX idx_relevance (relevance_score),
+    INDEX idx_predicted_label (predicted_label)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS magnitu_labels (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    entry_type ENUM('feed_item', 'email', 'lex_item', 'calendar_event') NOT NULL,
+    entry_id INT NOT NULL,
+    label VARCHAR(50) NOT NULL,
+    labeled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_label (entry_type, entry_id),
+    INDEX idx_entry (entry_type, entry_id),
+    INDEX idx_label (label)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS entry_favourites (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    entry_type ENUM('feed_item', 'email', 'lex_item', 'calendar_event') NOT NULL,
+    entry_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_favourite (entry_type, entry_id),
+    INDEX idx_entry (entry_type, entry_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS system_config (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    config_key VARCHAR(100) NOT NULL UNIQUE,
+    config_value MEDIUMTEXT DEFAULT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_key (config_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Seed instance config: Bearer key for Magnitu, profile slug (metadata), dashboard filter.
+-- The api_key is the Bearer token Magnitu must send on every push.
+INSERT INTO system_config (config_key, config_value) VALUES
+    ('api_key',               '{{API_KEY}}'),
+    ('magnitu_profile_slug',  '{{MAGNITU_PROFILE}}'),
+    ('default_labels_filter', 'investigation_lead,important')
+ON DUPLICATE KEY UPDATE config_value = VALUES(config_value);
