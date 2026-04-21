@@ -27,6 +27,8 @@ Satellites are generated from a JSON descriptor. Rebuild + redeploy instead of h
 
 The upload is a **slim Seismo 0.5 tree**: `git archive` first, then **generator pruning** removes mothership routes/controllers/views (feeds, Lex/Leg, diagnostics, setup, styleguide, …), plus `tests/`, `docs/`, `refresh_cron.php`, and related files. **Satellite mode** (`SEISMO_SATELLITE_MODE` in `config.local.php`) tells the app to expose only **Timeline**, **Filter**, **Highlights**, and **Settings** (General + Magnitu): no feed/Lex/Leg/diagnostics/source admin — entries are read from the mothership database; Magnitu pushes scores to the satellite’s local DB.
 
+**What gets pruned** is not hard-coded in this tool. The Seismo checkout ships **`satellite-prune.json`** at the repository root: `remove_dirs`, `remove_files` (the manifest file itself is listed so it is not left on the web root after pruning), and a `post_verify` block (paths that must remain, paths that must be gone, and optional `php_lint` targets). It must live at the root, not under `build/`, because `git archive` excludes the `build/` path. The file must be **committed** in the Seismo repo — `git archive` exports `HEAD`, not the working tree. Regenerating a satellite against an old Seismo tree without that file fails with a clear error. After each build, the generator runs those checks so a missed path fails the build instead of a broken deploy.
+
 ## Prerequisites
 
 - PHP 8.0+ with the `ctype`, `pcre`, `json` extensions (standard on any PHP-capable host).
@@ -126,9 +128,14 @@ seismo-generator/
 ├── lib/
 │   ├── GenerateService.php   # shared build logic (CLI + GUI)
 │   ├── Archiver.php          # git archive of seismo_source into build/<slug>/
-│   ├── SatelliteBundlePruner.php  # remove mothership-only files after archive
+│   ├── FileTreeUtil.php     # recursive directory delete
+│   ├── SatellitePruneManifest.php  # reads Seismo’s satellite-prune.json
+│   ├── SatelliteBundlePruner.php  # apply manifest after archive
+│   ├── SatelliteBundleVerifier.php  # post_verify + php -l
 │   ├── TemplateRenderer.php  # {{PLACEHOLDER}} substitution
 │   └── Wizard.php            # readline prompts for MySQL creds
+├── tests/
+│   └── smoke_prune_test.php  # stub tree + prune + verify (no git archive)
 ├── template/
 │   ├── config.local.php.tmpl
 │   ├── sql/install.sql.tmpl
@@ -151,7 +158,7 @@ php generate.php <satellite.json> [options]
 
 ## Contract with Seismo
 
-The generator exports the Seismo source at `HEAD` with `git archive`, then runs **`SatelliteBundlePruner`** to delete mothership-only routes, controllers, views, `tests/`, `docs/`, `routes_mothership.inc.php`, `refresh_cron.php`, and similar (see `lib/SatelliteBundlePruner.php`). Shared `src/` services used by both modes stay in place. It **adds** these generated files:
+The generator exports the Seismo source at `HEAD` with `git archive`, then runs **`SatelliteBundlePruner`** using **`satellite-prune.json`** from the Seismo tree (not the generator) to delete mothership-only routes, controllers, views, `tests/`, `docs/`, `refresh_cron.php`, and the paths listed there. Shared `src/` services used by both modes stay in place. It **adds** these generated files:
 
 | File | Purpose |
 |------|---------|
@@ -168,4 +175,4 @@ The archive uses `git archive` (not rsync), so anything that is `.gitignore`d st
 - **Local GUI** — `gui/index.php` returns **403** unless `REMOTE_ADDR` is `127.0.0.1` or `::1`. Do not expose it on `0.0.0.0` or a public host; it runs shell-level `git`/`tar` and writes into `build/`.
 - **Schema version** (`satellite.json` `schema_version`) is locked at `1`. If you upgrade Seismo's satellite export format incompatibly, bump both the mothership export and `GenerateService::SCHEMA_VERSION` in `lib/GenerateService.php`.
 - `mothership_remote_refresh_key` appears in plain text inside the generated `config.local.php`. It's also exposed to the satellite's public page so the Refresh button can call the mothership. That's intentional — satellites are public and the key acts as a cheap rate-limit rather than secrecy. If you need to restrict, put the satellite behind HTTP basic auth.
-- **Footprint** — mothership-only PHP UI and dev artefacts are removed after archive; `vendor/` and shared `src/` stay so Composer autoload and satellite routes keep working without a second manifest inside Seismo. Edit `SatelliteBundlePruner::REMOVE_*` when upstream adds routes.
+- **Footprint** — mothership-only PHP UI and dev artefacts are removed after archive; `vendor/` and shared `src/` stay so Composer autoload and satellite routes keep working. When the mothership gains new **mothership-only** surfaces, edit Seismo’s `satellite-prune.json` and run `php tests/smoke_prune_test.php` from the generator repo.

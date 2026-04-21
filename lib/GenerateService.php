@@ -5,8 +5,10 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/FileTreeUtil.php';
 require_once __DIR__ . '/TemplateRenderer.php';
 require_once __DIR__ . '/Archiver.php';
+require_once __DIR__ . '/SatelliteBundleVerifier.php';
 require_once __DIR__ . '/SatelliteBundlePruner.php';
 
 final class GenerateResult
@@ -111,7 +113,7 @@ final class GenerateService
                     );
                 }
                 $append("  removing existing {$targetDir}");
-                self::removeDir($targetDir);
+                FileTreeUtil::removeDir($targetDir);
             }
 
             $append('[1/4] git archive source → build/seismo-' . $slug . '/ ...');
@@ -121,14 +123,22 @@ final class GenerateService
             $append('  done (from commit ' . $commit . ')');
 
             $append('  pruning mothership-only paths (satellite bundle) ...');
-            SatelliteBundlePruner::prune($targetDir);
+            $pruneManifest = SatelliteBundlePruner::prune($targetDir);
             $append('  prune complete.');
+
+            $append('  verifying satellite bundle ...');
+            SatelliteBundleVerifier::verify($targetDir, $pruneManifest);
+            $append('  verify OK.');
 
             $append('[2/4] rendering templates ...');
             $renderer = new TemplateRenderer();
 
             $brandTitle  = (string)($satellite['brand']['title'] ?? $satellite['display_name']);
-            $brandAccent = (string)($satellite['brand']['accent'] ?? '');
+            $brandAccent = trim((string)($satellite['brand']['accent'] ?? ''));
+            if ($brandAccent === '') {
+                // Keep in sync with seismo_0.5/bootstrap.php SEISMO_BRAND_ACCENT_DEFAULT
+                $brandAccent = '#4a90e2';
+            }
             $refreshKey  = (string)($satellite['mothership_remote_refresh_key'] ?? '');
             $apiKey      = (string)$satellite['magnitu']['api_key'];
             $profile     = (string)$satellite['magnitu']['profile_slug'];
@@ -225,21 +235,6 @@ final class GenerateService
                 null
             );
         }
-    }
-
-    public static function removeDir(string $path): void
-    {
-        if (!is_dir($path)) {
-            return;
-        }
-        $it = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST
-        );
-        foreach ($it as $file) {
-            $file->isDir() ? rmdir($file->getRealPath()) : unlink($file->getRealPath());
-        }
-        rmdir($path);
     }
 
     public static function mask(string $secret): string

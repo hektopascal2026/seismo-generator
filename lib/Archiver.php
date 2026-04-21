@@ -9,6 +9,8 @@
  * Exported tree excludes: .git/, .cursor/, build/, terminals/, mcps/. These
  * are also listed in an `.gitattributes export-ignore` file inside Seismo, but
  * we also enforce them via the ATTRIBUTES_FILE override for belt-and-braces.
+ * Note: `satellite-prune.json` for seismo-generator lives at the repository
+ * root (not under `build/`) so it is included in the archive.
  */
 
 final class Archiver
