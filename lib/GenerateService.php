@@ -10,6 +10,7 @@ require_once __DIR__ . '/TemplateRenderer.php';
 require_once __DIR__ . '/Archiver.php';
 require_once __DIR__ . '/SatelliteBundleVerifier.php';
 require_once __DIR__ . '/SatelliteBundlePruner.php';
+require_once __DIR__ . '/SatelliteVendorBuilder.php';
 
 final class GenerateResult
 {
@@ -133,21 +134,27 @@ final class GenerateService
                 FileTreeUtil::removeDir($targetDir);
             }
 
-            $append('[1/4] git archive source → build/seismo-' . $slug . '/ ...');
+            $append('[1/5] git archive source → build/seismo-' . $slug . '/ ...');
             $archiver = new Archiver($seismoSource, $targetDir);
             $archiver->archive();
             $commit = $archiver->currentCommit();
             $append('  done (from commit ' . $commit . ')');
 
-            $append('  pruning mothership-only paths (satellite bundle) ...');
+            $append('[2/5] pruning mothership-only paths (satellite bundle) ...');
             $pruneManifest = SatelliteBundlePruner::prune($targetDir);
             $append('  prune complete.');
 
-            $append('  verifying satellite bundle ...');
+            $append('[3/5] satellite composer vendor (composer install --no-dev; strip SimplePie, EasyRdf, PHPUnit stack) ...');
+            $vendorLog = SatelliteVendorBuilder::rebuild($targetDir);
+            foreach (preg_split("/\r\n|\r|\n/", $vendorLog) as $cline) {
+                $append('  ' . $cline);
+            }
+
+            $append('[4/5] verifying satellite bundle ...');
             SatelliteBundleVerifier::verify($targetDir, $pruneManifest);
             $append('  verify OK.');
 
-            $append('[2/4] rendering templates ...');
+            $append('[5/5] rendering templates ...');
             $renderer = new TemplateRenderer();
 
             $brandTitle  = (string)($satellite['brand']['title'] ?? $satellite['display_name']);
@@ -219,8 +226,8 @@ final class GenerateService
             @chmod($targetDir . '/satellite.json', 0640);
 
             $append('  rendered: config.local.php, sql/install.sql, .htaccess, DEPLOY.md');
-            $append('[3/4] build complete');
-            $append('[4/4] next steps');
+            $append('  build complete');
+            $append('  next steps');
             $append(str_repeat('─', 64));
             $append("  Output: {$targetDir}");
             $append("  Upload to: {$inputs['mothership_url_base']}/seismo-{$slug}/");
