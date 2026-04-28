@@ -157,7 +157,12 @@ final class GenerateService
             $append('[5/5] rendering templates ...');
             $renderer = new TemplateRenderer();
 
-            $brandTitle  = (string)($satellite['brand']['title'] ?? $satellite['display_name']);
+            // Canonical title for SEISMO_BRAND_TITLE matches mothership display_name ("Seismo …").
+            // Older JSON exported brand.title as suffix-only — do not let that squash display_name.
+            $brandTitle = trim((string)($satellite['display_name'] ?? ''));
+            if ($brandTitle === '') {
+                $brandTitle = 'Seismo ' . ucfirst(str_replace('-', ' ', preg_replace('/[^a-z0-9-]/', '', $slug)));
+            }
             $brandAccent = trim((string)($satellite['brand']['accent'] ?? ''));
             if ($brandAccent === '') {
                 // Keep in sync with seismo_0.5/bootstrap.php SEISMO_BRAND_ACCENT_DEFAULT
