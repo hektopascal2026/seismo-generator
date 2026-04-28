@@ -1,0 +1,29 @@
+---
+description: Satellite deploy via FTP — patch touched files; avoid full regenerate unless needed
+alwaysApply: true
+---
+
+# Satellite iteration (FTP patch workflow)
+
+The user deploys satellites over **FTP** and wants to **iterate without regenerating** the whole satellite bundle for every small fix.
+
+## Default behaviour
+
+- After changes that affect the **live Seismo codebase** (`seismo_0.5` or equivalent source), assume deployment is **upload only the files that diff changed**, preserving server-side `config.local.php` unless the task explicitly updates generator output or secrets.
+- At the end of a relevant fix, give a short **“FTP upload list”**: paths **relative to the satellite web root** (same layout as Seismo: `src/…`, `views/…`, `routes_satellite.inc.php`, `index.php`, `bootstrap.php`, `assets/…`, etc.).
+
+## When full regenerate *is* appropriate
+
+Tell them to run **seismo-generator** (`--force`) and redeploy the **whole** build only when something in that pipeline actually changes, for example:
+
+- `template/` (`config.local.php.tmpl`, `sql/install.sql.tmpl`, `.htaccess.tmpl`, `DEPLOY.md.tmpl`)
+- `lib/SatelliteBundlePruner.php` / prune lists
+- New satellite from scratch, or intentionally replacing `satellite.json` / DB seeds / branding from generator output
+
+## When regenerate is *not* required
+
+Typical **PHP/view/asset fixes** in Seismo: patch **only touched paths** via FTP; no generator run.
+
+## Tone
+
+Do not nag them to “regenerate and re-upload the entire satellite” unless one of the generator-owned cases above applies.

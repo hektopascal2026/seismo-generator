@@ -213,6 +213,7 @@ header('Content-Type: text/html; charset=UTF-8');
         <input type="checkbox" id="force" name="force" value="1" <?= $form['force'] ? 'checked' : '' ?>>
         <label for="force">Replace existing <code>build/seismo-&lt;slug&gt;/</code></label>
       </div>
+      <p class="form-hint">Replace does not bypass JSON — upload or paste <code>satellite.json</code> each run.</p>
 
       <p style="margin-top:1.25rem">
         <button type="submit" class="primary">Generate</button>

@@ -43,9 +43,27 @@ final class GenerateService
      */
     public function parseAndValidateJson(string $raw): array
     {
+        $raw = trim($raw);
+        // Strip UTF-8 BOM — common when pasting from some editors / mothership export.
+        if (str_starts_with($raw, "\xEF\xBB\xBF")) {
+            $raw = substr($raw, 3);
+        }
+
+        if ($raw === '') {
+            return [
+                'error' => 'Missing satellite.json — paste it or upload a file. '
+                    . 'Replace existing build still needs the descriptor each time.',
+            ];
+        }
+
         $satellite = json_decode($raw, true);
         if (!is_array($satellite)) {
-            return ['error' => 'Invalid JSON.'];
+            $hint = '';
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $hint = ': ' . json_last_error_msg();
+            }
+
+            return ['error' => 'Invalid JSON' . $hint . '.'];
         }
 
         $schemaVersion = (int)($satellite['schema_version'] ?? 0);

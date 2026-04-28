@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS magnitu_labels (
     entry_type ENUM('feed_item', 'email', 'lex_item', 'calendar_event') NOT NULL,
     entry_id INT NOT NULL,
     label VARCHAR(50) NOT NULL,
+    reasoning TEXT DEFAULT NULL,
     labeled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY unique_label (entry_type, entry_id),
     INDEX idx_entry (entry_type, entry_id),
