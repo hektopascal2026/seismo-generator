@@ -51,8 +51,7 @@ final class GenerateService
 
         if ($raw === '') {
             return [
-                'error' => 'Missing satellite.json — paste it or upload a file. '
-                    . 'Replace existing build still needs the descriptor each time.',
+                'error' => 'Missing satellite.json — paste it or upload a file.',
             ];
         }
 
@@ -127,7 +126,7 @@ final class GenerateService
             if (is_dir($targetDir)) {
                 if (!$force) {
                     throw new RuntimeException(
-                        "build/seismo-{$slug}/ already exists. Enable “Replace existing build” or delete the folder."
+                        "build/seismo-{$slug}/ already exists. Pass --force to replace it, or delete the folder."
                     );
                 }
                 $append("  removing existing {$targetDir}");

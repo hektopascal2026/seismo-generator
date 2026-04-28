@@ -39,7 +39,6 @@ $form = [
     'db_pass' => '',
     'mothership_url_base' => '',
     'satellite_json' => '',
-    'force' => false,
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -50,7 +49,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $form['db_pass'] = (string)($_POST['db_pass'] ?? '');
     $form['mothership_url_base'] = trim((string)($_POST['mothership_url_base'] ?? ''));
     $form['satellite_json'] = (string)($_POST['satellite_json'] ?? '');
-    $form['force'] = isset($_POST['force']);
 
     $raw = $form['satellite_json'];
     if (isset($_FILES['satellite_file']) && is_array($_FILES['satellite_file'])
@@ -72,6 +70,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $satellite = $parsed['satellite'];
         $slug = (string)$parsed['slug'];
         $defaults = Wizard::defaultDeployInputs($satellite);
+        if ($form['mothership_url_base'] === '') {
+            $form['mothership_url_base'] = $defaults['mothership_url_base'];
+        }
 
         $inputs = [
             'db_host' => $form['db_host'] !== '' ? $form['db_host'] : $defaults['db_host'],
@@ -92,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $slug,
                 $inputs,
                 $src,
-                $form['force'],
+                true,
                 null,
                 $raw
             );
@@ -206,14 +207,8 @@ header('Content-Type: text/html; charset=UTF-8');
       </div>
       <div class="field">
         <label for="mothership_url_base">Mothership URL base (host for uploads, no trailing path)</label>
-        <input type="text" id="mothership_url_base" name="mothership_url_base" value="<?= e($form['mothership_url_base']) ?>" placeholder="https://example.com">
+        <input type="text" id="mothership_url_base" name="mothership_url_base" value="<?= e($form['mothership_url_base']) ?>" placeholder="https://example.com" autocomplete="off">
       </div>
-
-      <div class="check">
-        <input type="checkbox" id="force" name="force" value="1" <?= $form['force'] ? 'checked' : '' ?>>
-        <label for="force">Replace existing <code>build/seismo-&lt;slug&gt;/</code></label>
-      </div>
-      <p class="form-hint">Replace does not bypass JSON — upload or paste <code>satellite.json</code> each run.</p>
 
       <p style="margin-top:1.25rem">
         <button type="submit" class="primary">Generate</button>
@@ -225,5 +220,55 @@ header('Content-Type: text/html; charset=UTF-8');
       Server must listen on <strong>127.0.0.1</strong> only — remote clients get 403.
     </footer>
   </div>
+  <script>
+  (function() {
+    // Same mothership_base logic as Wizard::defaultDeployInputs() — fills from pasted satellite.json only (no baked-in URLs).
+    function mothershipUrlBaseFromJson(obj) {
+      var u = String(obj && obj.mothership_url != null ? obj.mothership_url : '').trim();
+      if (!u) return '';
+      var s = u.replace(/\/*$/, '');
+      var stripped = s.replace(/\/seismo[^/]*\/?$/i, '').replace(/\/*$/, '');
+      return stripped !== '' ? stripped : s;
+    }
+
+    function tryPrefill(ev) {
+      var baseEl = document.getElementById('mothership_url_base');
+      if (!baseEl || baseEl.value.trim() !== '') return;
+
+      function applyRaw(raw) {
+        raw = raw.replace(/^\uFEFF/, '').trim();
+        if (!raw) return;
+        try {
+          var j = JSON.parse(raw);
+          var b = mothershipUrlBaseFromJson(j);
+          if (b) baseEl.value = b;
+        } catch (e) { /* wait for valid paste */ }
+      }
+
+      var ta = document.getElementById('satellite_json');
+      if ((ev && ev.target === ta) || (!ev && ta && ta.value.trim())) {
+        applyRaw(ta.value);
+      }
+    }
+
+    document.getElementById('satellite_json').addEventListener('input', tryPrefill);
+    document.getElementById('satellite_file').addEventListener('change', function() {
+      var baseEl = document.getElementById('mothership_url_base');
+      if (!baseEl || baseEl.value.trim() !== '' || !this.files || !this.files[0]) return;
+      var f = this.files[0];
+      var r = new FileReader();
+      r.onload = function() {
+        try {
+          var raw = String(r.result || '').replace(/^\uFEFF/, '').trim();
+          var j = JSON.parse(raw);
+          var b = mothershipUrlBaseFromJson(j);
+          if (b) baseEl.value = b;
+        } catch (e) {}
+      };
+      r.readAsText(f);
+    });
+    tryPrefill();
+  })();
+  </script>
 </body>
 </html>
