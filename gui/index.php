@@ -202,7 +202,7 @@ header('Content-Type: text/html; charset=UTF-8');
         </div>
         <div class="field">
           <label for="db_pass">MySQL password</label>
-          <input type="password" id="db_pass" name="db_pass" value="<?= e($form['db_pass']) ?>" autocomplete="new-password">
+          <input type="text" id="db_pass" name="db_pass" value="<?= e($form['db_pass']) ?>" autocomplete="off" spellcheck="false">
         </div>
       </div>
       <div class="field">
